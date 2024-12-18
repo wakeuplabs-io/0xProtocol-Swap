@@ -13,6 +13,7 @@ interface UsePriceParams {
     sellAmount: string;
     chainId: number | undefined;
     taker: Address | undefined;
+    gaslessEnabled: boolean
 }
 
 const getPrice = async (
@@ -20,7 +21,8 @@ const getPrice = async (
     buyToken: Token | undefined,
     sellAmount: string,
     chainId: number,
-    taker: Address | undefined
+    taker: Address | undefined,
+    gaslessEnabled: boolean
 ): Promise<PriceResponse | null> => {
     if (!sellToken || !buyToken || !sellAmount || !chainId || !taker) return null;
 
@@ -38,7 +40,7 @@ const getPrice = async (
         tradeSurplusRecipient: FEE_RECIPIENT,
     };
 
-    return isNativeToken(sellToken.address)
+    return !gaslessEnabled || isNativeToken(sellToken.address)
         ? SwapService.getTokenSwapPrice(params)
         : GaslessService.getTokenGaslessPrice(params);
 };
@@ -49,12 +51,14 @@ export const use0xPrice = ({
     sellAmount,
     chainId,
     taker,
+    gaslessEnabled
 }: UsePriceParams) => {
+    const enabled  = !!sellToken && !!buyToken && !!sellAmount && !!chainId && !!taker
     const { data: priceData, isLoading } = useQuery({
-        queryKey: ["getPrice", sellToken, buyToken, sellAmount, chainId, taker],
-        queryFn: () => getPrice(sellToken, buyToken, sellAmount, chainId!, taker),
-        enabled: !!sellToken && !!buyToken && !!sellAmount && !!chainId && !!taker,
+        queryKey: ["getPrice", sellToken, buyToken, sellAmount, chainId, taker, gaslessEnabled],
+        queryFn: () => getPrice(sellToken, buyToken, sellAmount, chainId!, taker, gaslessEnabled),
+        enabled: enabled,
     });
 
-    return { priceData, isLoading };
+    return { priceData, isLoading : isLoading && enabled };
 };

@@ -6,12 +6,13 @@ export async function GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams;
         const tradeHash = searchParams.get("tradeHash");
         const res = await fetch(
-            `https://api.0x.org/tx-relay/v1/swap/status/${tradeHash}`,
+            `http://api.0x.org/gasless/status/${tradeHash}?chainId=${searchParams.get("chainId")}`,
             {
                 headers: {
                     "0x-api-key": process.env
                         .NEXT_PUBLIC_ZEROEX_API_KEY as string,
-                    "0x-chain-id": searchParams.get("chainId") as string,
+                    "0x-version": "v2",
+                    "Content-Type": "application/json",
                 },
             }
         );

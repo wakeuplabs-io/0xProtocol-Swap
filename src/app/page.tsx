@@ -26,15 +26,6 @@ const Home: NextPage = () => {
             <main className={styles.main}>
                <HomePage />
             </main>
-            <footer className={styles.footer}>
-                <a
-                    href="https://rainbow.me"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                >
-                    Wakeup
-                </a>
-            </footer>
         </div>
     );
 };

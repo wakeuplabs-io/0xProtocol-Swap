@@ -30,16 +30,18 @@ export const use0xStatus = ({
     txHash,
     isNative,
     chainId,
+    gaslessEnabled,
 }: {
     txHash?: Address;
     isNative: boolean;
     chainId?: number;
+    gaslessEnabled: boolean;
 }) => {
     const [status, setStatus] = useState<TxStatus>(TxStatus.Pending);
-
+    console.log("use0xStatus", txHash, isNative, chainId, gaslessEnabled);
     // Wagmi hook to check native transaction status
     const { status: txStatus } = useWaitForTransactionReceipt({
-        hash: isNative ? txHash : undefined,
+        hash: isNative || !gaslessEnabled ? txHash : undefined,
     });
 
     // Function to fetch gasless transaction status
@@ -69,7 +71,7 @@ export const use0xStatus = ({
 
     useEffect(() => {
         if (txHash) {
-            if (isNative) {
+            if (isNative || !gaslessEnabled) {
                 // Update status based on native transaction status
                 if (txStatus === "success") {
                     setStatus(TxStatus.Confirmed);
@@ -86,7 +88,7 @@ export const use0xStatus = ({
                 return () => clearInterval(interval); // Cleanup on unmount
             }
         }
-    }, [txHash, isNative, txStatus]);
+    }, [txHash, isNative, txStatus, gaslessEnabled]);
 
     return { status };
 };

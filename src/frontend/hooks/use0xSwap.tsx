@@ -10,9 +10,10 @@ import { publicClient } from "../client";
 interface UseSwapParams {
     quote: QuoteResponse | undefined; // Swap quote object
     chainId: number;
+    gaslessEnabled: boolean;
 }
 
-export const use0xSwap = ({ quote, chainId }: UseSwapParams) => {
+export const use0xSwap = ({ quote, chainId, gaslessEnabled }: UseSwapParams) => {
     const [isLoading, setIsLoading] = useState(false);
     const [transactionHash, setTransactionHash] = useState<Hex | undefined>();
     const [error, setError] = useState<any | undefined>();
@@ -177,7 +178,9 @@ export const use0xSwap = ({ quote, chainId }: UseSwapParams) => {
                 setError(new Error("Quote is required"));
                 return null;
             }
-            return isNativeToken ? await swapNormal() : await swapGasless();
+            return !gaslessEnabled || isNativeToken
+                ? await swapNormal()
+                : await swapGasless();
         } catch (error) {
             handleError(error);
             setError(error);

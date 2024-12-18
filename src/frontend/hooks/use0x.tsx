@@ -1,3 +1,4 @@
+"use client";
 import React, {
     createContext,
     useReducer,
@@ -26,11 +27,11 @@ type State0x = {
     sellToken: Token | undefined;
     buyToken: Token | undefined;
     sellAmount: string;
-    isNativeToken: boolean;
     tradeDirection: string;
     quote: QuoteResponse | undefined;
     finalized: boolean;
     isLoading: boolean;
+    gaslessEnabled: boolean;
 };
 
 type Actions0x =
@@ -40,10 +41,10 @@ type Actions0x =
     | { type: "SET_TRADE_DIRECTION"; payload: string }
     | { type: "SET_CHAIN_ID"; payload: number | null }
     | { type: "SET_QUOTE"; payload: any }
-    | { type: "SET_IS_NATIVE_TOKEN"; payload: boolean }
     | { type: "SET_FINALIZED"; payload: boolean }
     | { type: "RESET" }
-    | { type: "LOADING"; payload: boolean };
+    | { type: "LOADING"; payload: boolean }
+    | { type: "SET_USE_GASLESS"; payload: boolean };
 
 const initialState: State0x = {
     sellToken: undefined,
@@ -51,9 +52,9 @@ const initialState: State0x = {
     sellAmount: "0",
     tradeDirection: "sell",
     quote: undefined,
-    isNativeToken: false,
     finalized: false,
     isLoading: false,
+    gaslessEnabled: true,
 };
 
 const Context0x = createContext<{
@@ -70,6 +71,7 @@ const Context0x = createContext<{
     swapTxHash: Address | undefined;
     swapError: any | undefined;
     lastQuoteFetch: number | undefined;
+    isNativeToken: boolean;
 }>({
     state: initialState,
     dispatch: () => null,
@@ -84,6 +86,7 @@ const Context0x = createContext<{
     swapError: undefined,
     lastQuoteFetch: undefined,
     isLoadingSwap: false,
+    isNativeToken: false,
 });
 
 const reducer = (state: State0x, action: Actions0x): State0x => {
@@ -98,12 +101,12 @@ const reducer = (state: State0x, action: Actions0x): State0x => {
             return { ...state, tradeDirection: action.payload };
         case "SET_QUOTE":
             return { ...state, quote: action.payload };
-        case "SET_IS_NATIVE_TOKEN":
-            return { ...state, isNativeToken: action.payload };
         case "SET_FINALIZED":
             return { ...state, finalized: action.payload };
         case "LOADING":
             return { ...state, isLoading: action.payload };
+        case "SET_USE_GASLESS":
+            return { ...state, gaslessEnabled: action.payload };
         case "RESET":
             return initialState;
         default:
@@ -123,7 +126,11 @@ export const Provider0x = ({ children }: { children: ReactNode }) => {
         isLoading: isLoadingSwap,
         transactionHash: swapTxHash,
         error: swapError,
-    } = use0xSwap({ quote: state.quote, chainId });
+    } = use0xSwap({
+        quote: state.quote,
+        chainId,
+        gaslessEnabled: state.gaslessEnabled,
+    });
 
     const { priceData, isLoading: isLoadingPrice } = use0xPrice({
         sellToken: state.sellToken,
@@ -131,12 +138,15 @@ export const Provider0x = ({ children }: { children: ReactNode }) => {
         sellAmount: state.sellAmount,
         chainId,
         taker: address,
+        gaslessEnabled: state.gaslessEnabled,
     });
 
     const chainTokens = useMemo(() => {
         return chainId ? TokensService.getTokenRecordsByChain(chainId) : {};
     }, [chainId]);
 
+    const isNative = isNativeToken(state.sellToken?.address as string);
+   
     useEffect(() => {
         if (!!Object.keys(chainTokens)) {
             dispatch({
@@ -156,6 +166,12 @@ export const Provider0x = ({ children }: { children: ReactNode }) => {
             dispatch({ type: "SET_FINALIZED", payload: true });
         }
     }, [swapTxHash, swapError]);
+
+    useEffect(() => {
+            dispatch({ type: "SET_USE_GASLESS", payload: !priceData?.issues.balance });
+    }, [priceData?.issues.balance]);
+
+
     // Periodic fetch for quote data
     useEffect(() => {
         const fetchQuote = async (isNativeToken = false) => {
@@ -179,32 +195,35 @@ export const Provider0x = ({ children }: { children: ReactNode }) => {
                     tradeSurplusRecipient: FEE_RECIPIENT,
                 };
 
-                const data = isNativeToken
-                    ? await SwapService.getQuote(params)
-                    : await GaslessService.getQuote(params);
+                const data =
+                    !state.gaslessEnabled || isNative
+                        ? await SwapService.getQuote(params)
+                        : await GaslessService.getQuote(params);
                 dispatch({ type: "SET_QUOTE", payload: data });
                 setLastQuoteFetch(Date.now());
                 dispatch({ type: "LOADING", payload: false });
             }
         };
-        const isNative = isNativeToken(state.sellToken?.address as string);
+     
         fetchQuote(isNative);
         const interval = setInterval(() => {
-            fetchQuote(isNative);
+            if (state.finalized) {
+                clearInterval(interval);
+            } else {
+                fetchQuote(isNative);
+            }
         }, 15000);
-        //check and set if is sell token is native
-        dispatch({
-            type: "SET_IS_NATIVE_TOKEN",
-            payload: isNative,
-        });
 
         return () => clearInterval(interval);
     }, [
         state.sellToken?.address,
         state.buyToken?.address,
         priceData?.sellAmount,
+        priceData?.issues.balance,
         chainId,
         address,
+        isNative,
+        state.finalized
     ]);
 
     const affiliateFee = useMemo(() => {
@@ -236,6 +255,7 @@ export const Provider0x = ({ children }: { children: ReactNode }) => {
                 allowanceNotRequired: priceData?.issues?.allowance === null,
                 lastQuoteFetch,
                 affiliateFee,
+                isNativeToken: isNative,
             }}
         >
             {children}

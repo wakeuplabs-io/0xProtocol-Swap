@@ -26,7 +26,7 @@ export const ConnectButtonCustom = ({
                     chain &&
                     (!authenticationStatus ||
                         authenticationStatus === "authenticated");
-                return !showConnected ? null : (
+                return (
                     <div
                         {...(!ready && {
                             "aria-hidden": true,
@@ -45,8 +45,8 @@ export const ConnectButtonCustom = ({
                                         type="button"
                                     >
                                         <div className="flex gap-2 items-center group">
-                                            <span className="group-hover:text-blue-600">Disconnected</span>
-                                            <ChevronDownIcon className="h-4 w-4 group-hover:text-blue-600" />
+                                            <span className="group-hover:text-black">Disconnected</span>
+                                            <ChevronDownIcon className="h-4 w-4 group-hover:text-black" />
                                         </div>
                                     </button>
                                 );
